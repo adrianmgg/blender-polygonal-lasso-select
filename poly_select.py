@@ -12,7 +12,7 @@ bl_info = {
     "author": "Adrian Guerra",
     "description": "adds a polygonal lasso select tool",
     "warning": "not stable, expect script to crash sometimes",
-    "version": (1,1)
+    "version": (1,2)
 }
 
 def draw_callback_px(self, context):
@@ -110,14 +110,16 @@ class PolyLassoOperator(bpy.types.Operator):
             self.bm=None
             viewport = context.area.regions[4]
             def point3dto2d(point3d):
+                for space in context.area.spaces:
+                    print(space.type)
                 point2d = view3d_utils.location_3d_to_region_2d(viewport,context.area.spaces[0].region_3d,point3d)
-                point2dshifted = point2d[0]+bpy.context.window.x, point2d[1]+bpy.context.window.x
+                point2dshifted = point2d[0]+context.window.x, point2d[1]+context.window.x
                 return point2dshifted
-            if bpy.context.mode=='OBJECT':
+            if context.mode=='OBJECT':
                 for visobj in bpy.context.visible_objects:
                     origin=visobj.location
                     self.visible_objects.append([visobj,point3dto2d(origin)])
-            if bpy.context.mode=='EDIT_MESH':
+            if context.mode=='EDIT_MESH':
                 activeobj=context.active_object
                 mesh=bmesh.from_edit_mesh(activeobj.data)
                 self.bm=mesh
@@ -129,7 +131,7 @@ class PolyLassoOperator(bpy.types.Operator):
             # Add the region OpenGL drawing callback
             # draw in view space with 'POST_VIEW' and 'PRE_VIEW'
             self._handle = bpy.types.SpaceView3D.draw_handler_add(draw_callback_px, args, 'WINDOW', 'POST_PIXEL')
-            self.mouse_pos = [0.0,0.0]
+            self.mouse_pos = [0,0]
             self.poly_points = []
 
             context.window_manager.modal_handler_add(self)

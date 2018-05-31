@@ -6,6 +6,15 @@ from mathutils.geometry import intersect_line_line_2d
 from mathutils import Vector
 import bmesh
 
+bl_info = {
+    "name": "Polygonal Lasso Select",
+    "category": "User Interface",
+    "author": "Adrian Guerra",
+    "description": "adds a polygonal lasso select tool",
+    "warning": "not stable, expect script to crash sometimes",
+    "version": (1,1)
+}
+
 def draw_callback_px(self, context):
 
     font_id = 0  # XXX, need to find out how best to get this.
@@ -37,8 +46,8 @@ def draw_callback_px(self, context):
     bgl.glDisable(bgl.GL_BLEND)
     bgl.glColor4f(0.0, 0.0, 0.0, 1.0)
 
-class ModalDrawOperator(bpy.types.Operator):
-    """Draw a line with the mouse"""
+class PolyLassoOperator(bpy.types.Operator):
+    """Polygonal lasso select tool"""
     bl_idname = "view3d.poly_select"
     bl_label = "Poly Select"
 
@@ -131,11 +140,11 @@ class ModalDrawOperator(bpy.types.Operator):
 
 
 def register():
-    bpy.utils.register_class(ModalDrawOperator)
+    bpy.utils.register_class(PolyLassoOperator)
 
 
 def unregister():
-    bpy.utils.unregister_class(ModalDrawOperator)
+    bpy.utils.unregister_class(PolyLassoOperator)
 
 if __name__ == "__main__":
     register()

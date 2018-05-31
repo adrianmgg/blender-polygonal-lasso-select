@@ -4,6 +4,7 @@ import blf
 from bpy_extras import view3d_utils
 from mathutils.geometry import intersect_line_line_2d
 from mathutils import Vector
+import bmesh
 
 def draw_callback_px(self, context):
 
@@ -27,6 +28,8 @@ def draw_callback_px(self, context):
     bgl.glBegin(bgl.GL_POINTS)
     bgl.glColor4f(0.0, 1.0, 1.0, 0.5)
     for obj,point in self.visible_objects:
+        bgl.glVertex2f(point[0],point[1])
+    for vert,point in self.verts:
         bgl.glVertex2f(point[0],point[1])
     bgl.glEnd()
     # restore opengl defaults
@@ -52,20 +55,23 @@ class ModalDrawOperator(bpy.types.Operator):
         print(str(diffx)+','+str(diffy))
         return diffx<=tolerance and diffy<=tolerance
 
-    def checkpt(self,point,edgept1,edgept2):
-        intersect=intersect_line_line_2d(Vector(point),Vector([point[0],0]),Vector(edgept1),Vector(edgept2))
-        return intersect!=None
+    def checkpt(self,point2d):
+        intersections=0
+        for i in range(len(self.poly_points)):
+            pt1=self.poly_points[i]
+            pt2=self.poly_points[(i+1)%len(self.poly_points)]
+            intersect=intersect_line_line_2d(Vector(point2d),Vector([point2d[0],0]),Vector(pt1),Vector(pt2))
+            if intersect!=None:
+                intersections+=1
+        return intersections%2!=0
 
     def select_objects(self):
         for obj,center in self.visible_objects:
-            intersections=0
-            for i in range(len(self.poly_points)):
-                pt1=self.poly_points[i]
-                pt2=self.poly_points[(i+1)%len(self.poly_points)]
-                if self.checkpt(center,pt1,pt2):
-                    intersections+=1
-            if intersections%2!=0:
+            if self.checkpt(center):
                 obj.select=True
+        for vert,pos in self.verts:
+            if self.checkpt(pos):
+                vert.select=True
     
 
 
@@ -90,19 +96,30 @@ class ModalDrawOperator(bpy.types.Operator):
 
     def invoke(self, context, event):
         if context.area.type == 'VIEW_3D':
-            self.visible_objects=[]
+            self.visible_objects=[]#rename to objects or something
+            self.verts=[]
+            self.bm=None
             viewport = context.area.regions[4]
-            for visobj in bpy.context.visible_objects:
-                origin=visobj.location
-                origin2d = view3d_utils.location_3d_to_region_2d(viewport,context.area.spaces[0].region_3d,origin)
-                inview = origin2d[0]+bpy.context.window.x, origin2d[1]+bpy.context.window.x
-                self.visible_objects.append([visobj,inview])
+            def point3dto2d(point3d):
+                point2d = view3d_utils.location_3d_to_region_2d(viewport,context.area.spaces[0].region_3d,point3d)
+                point2dshifted = point2d[0]+bpy.context.window.x, point2d[1]+bpy.context.window.x
+                return point2dshifted
+            if bpy.context.mode=='OBJECT':
+                for visobj in bpy.context.visible_objects:
+                    origin=visobj.location
+                    self.visible_objects.append([visobj,point3dto2d(origin)])
+            if bpy.context.mode=='EDIT_MESH':
+                activeobj=context.active_object
+                mesh=bmesh.from_edit_mesh(activeobj.data)
+                self.bm=mesh
+                for vert in mesh.verts:
+                    worldpos=activeobj.matrix_world*vert.co
+                    self.verts.append([vert,point3dto2d(worldpos)])
             # the arguments we pass the the callback
             args = (self, context)
             # Add the region OpenGL drawing callback
             # draw in view space with 'POST_VIEW' and 'PRE_VIEW'
             self._handle = bpy.types.SpaceView3D.draw_handler_add(draw_callback_px, args, 'WINDOW', 'POST_PIXEL')
-
             self.mouse_pos = [0.0,0.0]
             self.poly_points = []
 
